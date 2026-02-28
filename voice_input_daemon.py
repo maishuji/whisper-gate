@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 voice_input_daemon.py - Push-to-talk daemon that records while a hotkey is
-held, transcribes via the whisper-rest API, then types the result.
+held, transcribes via the whisper-gate API, then types the result.
 
 Usage:
     python voice_input_daemon.py --url http://localhost:8178 --lang en --key "ctrl+alt+space"
@@ -214,7 +214,7 @@ class PushToTalkDaemon:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push-to-talk transcription daemon")
-    parser.add_argument("--url", default="http://localhost:8178", help="whisper-rest API base URL")
+    parser.add_argument("--url", default="http://localhost:8178", help="whisper-gate API base URL")
     parser.add_argument("--lang", default="en", help="Language code (e.g. en, fr, auto)")
     parser.add_argument("--key", default="ctrl+alt+space", help="Hotkey combo, e.g. ctrl+alt+space")
     args = parser.parse_args()

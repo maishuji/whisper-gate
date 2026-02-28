@@ -1,6 +1,6 @@
-# whisper-rest
+# whisper-gate
 
-A lightweight local REST API that wraps [`whisper-cli`](https://github.com/ggerganov/whisper.cpp) (from whisper.cpp) and exposes it over HTTP. Comes with two client utilities:
+A lightweight local gateway that wraps [`whisper-cli`](https://github.com/ggerganov/whisper.cpp) (from whisper.cpp) and exposes it over HTTP. Comes with two client utilities:
 
 - **`record_and_transcribe.py`** – record a fixed-duration clip from your microphone and print the transcription.
 - **`voice_input_daemon.py`** – a push-to-talk daemon that listens for a hotkey, records while the hotkey is held, then types the transcription at your cursor.
@@ -61,8 +61,8 @@ The API server is a thin wrapper: it writes the uploaded audio to a temp file, s
 
 ```bash
 # Clone and enter the repo
-git clone <repo-url> whisper-rest
-cd whisper-rest
+git clone <repo-url> whisper-gate
+cd whisper-gate
 
 # Install uv (if not present) and sync all Python dependencies
 make install

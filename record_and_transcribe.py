@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 record_and_transcribe.py - Record from the microphone and transcribe via the
-whisper-rest API.
+whisper-gate API.
 
 Usage:
     python record_and_transcribe.py --url http://localhost:8178 --duration 5 --lang en
@@ -61,7 +61,7 @@ def transcribe(wav_bytes: bytes, url: str, lang: str) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Record and transcribe via whisper-rest API")
+    parser = argparse.ArgumentParser(description="Record and transcribe via whisper-gate API")
     parser.add_argument("--url", default="http://localhost:8178", help="Base URL of the API")
     parser.add_argument("--duration", type=int, default=5, help="Recording duration in seconds")
     parser.add_argument("--lang", default="en", help="Language code (e.g. en, fr, auto)")

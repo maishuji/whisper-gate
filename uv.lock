@@ -1175,7 +1175,7 @@ wheels = [
 ]
 
 [[package]]
-name = "whisper-rest"
+name = "whisper-gate"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [

@@ -1,4 +1,4 @@
-# Copilot Instructions – whisper-rest
+# Copilot Instructions – whisper-gate
 
 ## Project overview
 

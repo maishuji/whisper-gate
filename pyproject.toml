@@ -1,7 +1,7 @@
 [project]
-name = "whisper-rest"
+name = "whisper-gate"
 version = "1.0.0"
-description = "Thin FastAPI REST wrapper around whisper-cli"
+description = "Lightweight local gateway exposing whisper-cli over HTTP"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi",
@@ -39,7 +39,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["whisper_api"]
+known-first-party = ["whisper_api", "whisper_gate"]
 
 [tool.ruff.format]
 quote-style = "double"
