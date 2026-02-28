@@ -15,3 +15,38 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (unused imports, undefined names, …)
+    "I",   # isort (import ordering)
+    "UP",  # pyupgrade (modern Python syntax)
+    "B",   # flake8-bugbear (likely bugs and design issues)
+    "C4",  # flake8-comprehensions (unnecessary comprehensions)
+    "SIM", # flake8-simplify (simplifiable code)
+    "TID", # flake8-tidy-imports (banned/relative imports)
+    "RUF", # ruff-specific rules
+]
+ignore = [
+    "SIM108", # ternary vs if/else - prefer readability
+    "B008",   # FastAPI uses File(...)/Form(...) as argument defaults by design
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["whisper_api"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.4",
+]

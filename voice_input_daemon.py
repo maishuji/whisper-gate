@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-voice_input_daemon.py – Push-to-talk daemon that records while a hotkey is
+voice_input_daemon.py - Push-to-talk daemon that records while a hotkey is
 held, transcribes via the whisper-rest API, then types the result.
 
 Usage:
@@ -25,13 +25,14 @@ from pynput.keyboard import Controller, Key
 # ---------------------------------------------------------------------------
 SAMPLE_RATE = 16000
 CHANNELS = 1
-MIN_DURATION = 0.5   # seconds – recordings shorter than this are skipped
+MIN_DURATION = 0.5  # seconds - recordings shorter than this are skipped
 DTYPE = "int16"
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def parse_hotkey(key_str: str) -> frozenset:
     """
@@ -83,6 +84,7 @@ def type_text(text: str) -> None:
 # ---------------------------------------------------------------------------
 # Daemon
 # ---------------------------------------------------------------------------
+
 
 class PushToTalkDaemon:
     def __init__(self, url: str, lang: str, hotkey: frozenset):
@@ -163,9 +165,12 @@ class PushToTalkDaemon:
         """Return a canonical representation of a key for set membership."""
         # Map left/right modifiers to their generic counterpart
         _aliases = {
-            Key.ctrl_l: Key.ctrl, Key.ctrl_r: Key.ctrl,
-            Key.alt_l: Key.alt,   Key.alt_r: Key.alt,
-            Key.shift_l: Key.shift, Key.shift_r: Key.shift,
+            Key.ctrl_l: Key.ctrl,
+            Key.ctrl_r: Key.ctrl,
+            Key.alt_l: Key.alt,
+            Key.alt_r: Key.alt,
+            Key.shift_l: Key.shift,
+            Key.shift_r: Key.shift,
         }
         return _aliases.get(key, key)
 
@@ -205,6 +210,7 @@ class PushToTalkDaemon:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push-to-talk transcription daemon")

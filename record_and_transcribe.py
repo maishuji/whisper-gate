@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-record_and_transcribe.py – Record from the microphone and transcribe via the
+record_and_transcribe.py - Record from the microphone and transcribe via the
 whisper-rest API.
 
 Usage:
@@ -16,7 +16,6 @@ import wave
 import numpy as np
 import requests
 import sounddevice as sd
-
 
 SAMPLE_RATE = 16000  # whisper expects 16 kHz
 CHANNELS = 1
@@ -66,8 +65,12 @@ def main() -> None:
     parser.add_argument("--url", default="http://localhost:8178", help="Base URL of the API")
     parser.add_argument("--duration", type=int, default=5, help="Recording duration in seconds")
     parser.add_argument("--lang", default="en", help="Language code (e.g. en, fr, auto)")
-    parser.add_argument("--device", type=int, default=None, help="Input device index (see --list-devices)")
-    parser.add_argument("--list-devices", action="store_true", help="List available audio input devices and exit")
+    parser.add_argument(
+        "--device", type=int, default=None, help="Input device index (see --list-devices)"
+    )
+    parser.add_argument(
+        "--list-devices", action="store_true", help="List available audio input devices and exit"
+    )
     args = parser.parse_args()
 
     if args.list_devices:
@@ -81,7 +84,7 @@ def main() -> None:
     try:
         text = transcribe(wav_bytes, args.url, args.lang)
     except requests.HTTPError as exc:
-        print(f"❌  API error: {exc.response.status_code} – {exc.response.text}", file=sys.stderr)
+        print(f"❌  API error: {exc.response.status_code} - {exc.response.text}", file=sys.stderr)
         sys.exit(1)
 
     print(f"\n📝  {text}\n")

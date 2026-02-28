@@ -1,7 +1,9 @@
+import contextlib
 import os
 import subprocess
 import tempfile
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 APP = FastAPI(
     title="Whisper REST API",
@@ -63,7 +65,7 @@ async def transcribe(
         cmd.append("-nfa")
 
     try:
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise HTTPException(
                 status_code=500,
@@ -76,12 +78,10 @@ async def transcribe(
         raise HTTPException(
             status_code=500,
             detail={"error": "failed to run whisper-cli", "raw": str(exc)},
-        )
+        ) from exc
     finally:
-        try:
+        with contextlib.suppress(OSError):
             os.remove(tmp)
-        except OSError:
-            pass
 
     # whisper-cli emits timestamps + text; strip leading/trailing whitespace
     text = out.strip()
