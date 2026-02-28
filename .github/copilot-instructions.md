@@ -96,4 +96,66 @@ perf(daemon): skip transcription for recordings under 0.5s
 
 - All runtime dependencies go in `pyproject.toml` under `[project] dependencies`.
 - Use `uv add <package>` to add a new dependency; commit both `pyproject.toml` and `uv.lock`.
+- Dev-only dependencies (pytest, ruff, …) go in `[dependency-groups] dev` via `uv add --dev`.
 - Do not vendor or bundle whisper.cpp — it is expected to be compiled separately at `~/Workplace/whisper.cpp`.
+
+---
+
+## Testing policy
+
+Every new feature or bug fix **must** be accompanied by unit tests. Generate or
+update tests as part of the same change — never leave a feature untested.
+
+### Rules
+
+- Use **`pytest`** for all tests. Test files live in `tests/` and are named `test_<module>.py`.
+- After implementing a feature, always ask: *"what can break here?"* and cover it.
+- Mock all external I/O — subprocess calls, filesystem, network, audio hardware:
+  - `subprocess.run` → `unittest.mock.patch("subprocess.run")`
+  - `sounddevice` → mock the `rec()` / `InputStream` calls
+  - HTTP calls in clients → use `httpx` mock transport or `responses`
+- Each test function must have a clear docstring stating **what** it tests and **why**.
+- Aim for at minimum:
+  - One **happy-path** test
+  - One **error / edge-case** test per meaningful branch
+
+### What to test per module
+
+| Module | Minimum coverage |
+|---|---|
+| `whisper_api.py` | `/health` 200, `/transcribe` happy path, missing model 500, subprocess crash 500 |
+| `voice_input_daemon.py` | `parse_hotkey` correct key set, min-duration skip logic, `to_wav_bytes` roundtrip |
+| `record_and_transcribe.py` | `to_wav_bytes` roundtrip (16 kHz / mono / int16) |
+
+### What NOT to test
+
+- Actual whisper-cli transcription quality (integration concern, needs GPU + model)
+- `sounddevice` hardware recording (hardware-dependent)
+- `pynput` keyboard injection (requires a display server)
+
+### Running tests
+
+```bash
+make test-unit
+# or directly:
+uv run pytest tests/ -v
+```
+
+---
+
+## Quality check policy
+
+Before considering any task complete, run the full quality check and fix all
+findings before presenting the result.
+
+### Checklist (run in order)
+
+1. **Format** — `make fmt` must produce no diff.
+2. **Lint** — `make lint` must pass with zero warnings.
+3. **Tests** — `make test-unit` must pass with no failures or errors.
+4. **Type hints** — all new function signatures must carry full type annotations.
+5. **No unused imports** — ruff `F401` must not fire on any new code.
+6. **No debug leftovers** — no `print()` debug statements, commented-out code, or
+   `TODO` stubs left in finished code (open a `TODO.md` entry instead).
+
+If any check fails, fix the issue and re-run before presenting the final code.

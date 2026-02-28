@@ -1,4 +1,4 @@
-.PHONY: install run dev health test record list-devices ptt download-model download-model-en download-model-large lint fmt clean help
+.PHONY: install run dev health test test-unit record list-devices ptt download-model download-model-en download-model-large lint fmt clean help
 
 HOST          ?= 0.0.0.0
 PORT          ?= 8178
@@ -65,6 +65,10 @@ download-model-en:
 ## Download large-v3 multilingual model (~3.1 GB, best quality, needs ~6 GB VRAM)
 download-model-large:
 	$(HOME)/Workplace/whisper.cpp/models/download-ggml-model.sh large-v3
+
+## Run unit tests
+test-unit:
+	uv run pytest tests/ -v
 
 ## Lint all Python files with ruff
 lint:
