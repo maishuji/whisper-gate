@@ -1,0 +1,58 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# ── uv / virtual environments ────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.env/
+
+# ── Distribution / packaging ─────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+
+# ── Testing & coverage ───────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.coveragerc
+
+# ── Type checkers ────────────────────────────────────────────────────────────
+.mypy_cache/
+.pyright/
+pyrightconfig.json
+
+# ── Editors & IDEs ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Temporary audio files ────────────────────────────────────────────────────
+# (whisper-cli writes temp WAVs here during transcription)
+/tmp/*.wav
+*.wav
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+
+# ── Secrets / local config ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── whisper.cpp models (large binaries — do not commit) ──────────────────────
+*.bin
+*.gguf

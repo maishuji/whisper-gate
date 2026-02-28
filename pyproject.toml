@@ -1,0 +1,17 @@
+[project]
+name = "whisper-rest"
+version = "1.0.0"
+description = "Thin FastAPI REST wrapper around whisper-cli"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "sounddevice",
+    "numpy",
+    "requests",
+    "pynput",
+]
+
+[tool.uv]
+package = false
