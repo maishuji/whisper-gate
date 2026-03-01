@@ -5,6 +5,7 @@ All subprocess and filesystem calls are mocked so no GPU, whisper-cli binary,
 or model file is required to run these tests.
 """
 
+import io
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -189,3 +190,62 @@ class TestTranscribe:
 
         cmd = mock_run.call_args[0][0]
         assert "-nfa" in cmd
+
+
+class _FakeProcess:
+    def __init__(self, lines: list[str], returncode: int = 0):
+        self.stdout = iter(lines)
+        self.stderr = io.StringIO("")
+        self._returncode = returncode
+
+    def wait(self, timeout: float | None = None):
+        return self._returncode
+
+    def poll(self):
+        return self._returncode
+
+    def terminate(self):
+        return None
+
+
+class TestTranscribeStream:
+    def test_transcribe_stream_happy_path(self, client):
+        """POST /transcribe/stream streams partial events then done."""
+        fake_process = _FakeProcess(["hello\n", "world\n"], returncode=0)
+
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("subprocess.Popen", return_value=fake_process),
+            patch("os.remove"),
+            client.stream(
+                "POST",
+                "/transcribe/stream",
+                files={"audio": ("test.wav", _make_wav_bytes(), "audio/wav")},
+                data={"lang": "en"},
+            ) as resp,
+        ):
+            lines = [line for line in resp.iter_lines() if line]
+
+        assert resp.status_code == 200
+        assert any("event: partial" in line for line in lines)
+        assert any("event: done" in line for line in lines)
+
+    def test_transcribe_stream_error_event(self, client):
+        """POST /transcribe/stream sends error event on non-zero exit."""
+        fake_process = _FakeProcess(["oops\n"], returncode=1)
+
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("subprocess.Popen", return_value=fake_process),
+            patch("os.remove"),
+            client.stream(
+                "POST",
+                "/transcribe/stream",
+                files={"audio": ("test.wav", _make_wav_bytes(), "audio/wav")},
+                data={"lang": "en"},
+            ) as resp,
+        ):
+            lines = [line for line in resp.iter_lines() if line]
+
+        assert resp.status_code == 200
+        assert any("event: error" in line for line in lines)
