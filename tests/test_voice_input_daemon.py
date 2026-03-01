@@ -9,9 +9,10 @@ import io
 import wave
 
 import numpy as np
+import pytest
 from pynput.keyboard import Key
 
-from voice_input_daemon import parse_hotkey, to_wav_bytes
+from voice_input_daemon import parse_hotkey, to_wav_bytes, transcribe_stream
 
 
 class TestParseHotkey:
@@ -82,3 +83,57 @@ class TestToWavBytes:
         wav = to_wav_bytes(self._make_frames(seconds))
         with wave.open(io.BytesIO(wav)) as wf:
             assert wf.getnframes() == int(16000 * seconds)
+
+
+class _FakeResponse:
+    def __init__(self, lines: list[str], status_code: int = 200):
+        self._lines = lines
+        self.status_code = status_code
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError("bad status")
+
+    def iter_lines(self, decode_unicode: bool = False):
+        for line in self._lines:
+            yield line if decode_unicode else line.encode("utf-8")
+
+
+class TestTranscribeStream:
+    def test_transcribe_stream_happy_path(self, monkeypatch):
+        """transcribe_stream returns final text and calls on_partial for chunks."""
+        lines = [
+            "event: partial",
+            'data: {"text": "hello"}',
+            "",
+            "event: partial",
+            'data: {"text": "world"}',
+            "",
+            "event: done",
+            'data: {"text": "hello world"}',
+            "",
+        ]
+        response = _FakeResponse(lines)
+        captured: list[str] = []
+
+        def fake_post(*args, **kwargs):
+            return response
+
+        monkeypatch.setattr("requests.post", fake_post)
+
+        result = transcribe_stream(b"wav", "http://localhost:8178", "en", captured.append)
+        assert result == "hello world"
+        assert captured == ["hello", "world"]
+
+    def test_transcribe_stream_error_event(self, monkeypatch):
+        """transcribe_stream raises on error event payload."""
+        lines = ["event: error", 'data: {"error": "boom"}', ""]
+        response = _FakeResponse(lines)
+
+        def fake_post(*args, **kwargs):
+            return response
+
+        monkeypatch.setattr("requests.post", fake_post)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            transcribe_stream(b"wav", "http://localhost:8178", "en")

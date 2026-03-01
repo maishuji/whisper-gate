@@ -9,10 +9,12 @@ Usage:
 
 import argparse
 import io
+import json
 import sys
 import threading
 import time
 import wave
+from collections.abc import Callable
 
 import numpy as np
 import requests
@@ -71,6 +73,48 @@ def transcribe(wav_bytes: bytes, url: str, lang: str) -> str:
     )
     resp.raise_for_status()
     return resp.json().get("text", "").strip()
+
+
+def transcribe_stream(
+    wav_bytes: bytes,
+    url: str,
+    lang: str,
+    on_partial: Callable[[str], None] | None = None,
+) -> str:
+    resp = requests.post(
+        f"{url.rstrip('/')}/transcribe/stream",
+        files={"audio": ("audio.wav", wav_bytes, "audio/wav")},
+        data={"lang": lang},
+        timeout=120,
+        stream=True,
+    )
+    resp.raise_for_status()
+
+    current_event: str | None = None
+    for line in resp.iter_lines(decode_unicode=True):
+        if not line:
+            continue
+        if line.startswith("event:"):
+            current_event = line.split(":", 1)[1].strip()
+            continue
+        if line.startswith("data:"):
+            payload = line.split(":", 1)[1].strip()
+            try:
+                data = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+
+            if current_event == "partial":
+                text = str(data.get("text", ""))
+                if on_partial is not None:
+                    on_partial(text)
+            elif current_event == "done":
+                return str(data.get("text", "")).strip()
+            elif current_event == "error":
+                message = str(data.get("error", "unknown error"))
+                raise RuntimeError(message)
+
+    return ""
 
 
 def type_text(text: str) -> None:
@@ -141,14 +185,28 @@ class PushToTalkDaemon:
             return
 
         wav_bytes = to_wav_bytes(frames)
+        partials: list[str] = []
+
+        def _on_partial(text: str) -> None:
+            partials.append(text)
+            sys.stdout.write(f"\r  ✍️  {text}")
+            sys.stdout.flush()
+
         try:
-            text = transcribe(wav_bytes, self.url, self.lang)
+            text = transcribe_stream(wav_bytes, self.url, self.lang, on_partial=_on_partial)
         except requests.HTTPError as exc:
+            if partials:
+                print("", flush=True)
             print(f"  ❌ API error: {exc.response.status_code}", flush=True)
             return
         except Exception as exc:
+            if partials:
+                print("", flush=True)
             print(f"  ❌ Error: {exc}", flush=True)
             return
+
+        if partials:
+            print("", flush=True)
 
         if not text:
             print("  (empty result, skipped)", flush=True)

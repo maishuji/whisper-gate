@@ -37,6 +37,17 @@ A lightweight local gateway that wraps [`whisper-cli`](https://github.com/ggerga
                                                                   │  whisper-cli (C++ binary)│
                                                                   │  + ggml model file       │
                                                                   └─────────────────────────┘
+
+┌─────────────────────────┐      HTTP POST /transcribe/stream     ┌─────────────────────────┐
+│  voice_input_daemon.py  │ ──────────────────────────────────►   │    whisper_api.py        │
+│  (streaming mode)       │ ◄──────────────────────────────────   │    (SSE stream)          │
+└─────────────────────────┘    SSE events: partial, done, error    └────────────┬────────────┘
+                                                                             │ subprocess
+                                                                             ▼
+                                                                  ┌─────────────────────────┐
+                                                                  │  whisper-cli (C++ binary)│
+                                                                  │  + ggml model file       │
+                                                                  └─────────────────────────┘
 ```
 
 The API server is a thin wrapper: it writes the uploaded audio to a temp file, shells out to `whisper-cli`, captures only stdout (clean transcription), and returns it as JSON. All model loading noise goes to stderr and is discarded.
@@ -184,6 +195,35 @@ curl -s -X POST http://localhost:8178/transcribe \
 
 ---
 
+### `POST /transcribe/stream`
+
+Stream partial transcription text via Server-Sent Events (SSE). This is useful for long clips: the client can show partial lines as soon as the model emits them, then a final `done` event with the full transcript.
+
+**Request** – `multipart/form-data`:
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `audio` | file | ✅ | — | WAV audio file (16 kHz mono recommended) |
+| `lang` | string | | `en` | Language code: `en`, `fr`, `de`, `ja`, `auto`, etc. |
+| `device` | integer | | `0` | GPU/CPU device index passed to `whisper-cli` via `-dev` |
+| `no_flash_attn` | boolean | | `false` | Disable flash attention (`-nfa` flag) |
+
+**SSE events:**
+
+- `partial` → `{"text": "<line>"}`
+- `done` → `{"text": "<full transcript>"}`
+- `error` → `{"error": "<message>"}`
+
+**curl example:**
+
+```bash
+curl -N -X POST http://localhost:8178/transcribe/stream \
+  -F "audio=@recording.wav" \
+  -F "lang=en"
+```
+
+---
+
 ## Client utilities
 
 ### `record_and_transcribe.py`
@@ -222,6 +262,8 @@ uv run record_and_transcribe.py --device 2 --duration 5
 ### `voice_input_daemon.py` (push-to-talk)
 
 A background daemon that watches for a configurable hotkey. While the hotkey is **held**, audio is recorded from the default microphone. On **release**, the audio is sent to the API and the transcription is **typed at the current cursor position** using `pynput`.
+
+The daemon uses the streaming endpoint by default, so you will see partial lines appear in the terminal while the server processes the audio. Final typing still happens after the `done` event.
 
 ```
 usage: voice_input_daemon.py [-h] [--url URL] [--lang LANG] [--key KEY]
