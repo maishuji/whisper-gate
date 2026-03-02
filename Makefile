@@ -1,4 +1,4 @@
-.PHONY: install run dev health test test-unit record list-devices ptt download-model download-model-en download-model-large lint fmt clean help
+.PHONY: install run dev health test test-unit record list-devices ptt download-model download-model-en download-model-large lint fmt clean help tailscale-install tailscale-ip tailscale-health
 
 HOST          ?= 0.0.0.0
 PORT          ?= 8178
@@ -78,6 +78,23 @@ lint:
 fmt:
 	uv run ruff format .
 
+## Install Tailscale (Linux only)
+tailscale-install:
+	curl -fsSL https://tailscale.com/install.sh | sh
+	@echo ">>> Run: sudo tailscale up"
+	@echo ">>> Then run: make tailscale-ip"
+
+## Show this machine's Tailscale IP
+tailscale-ip:
+	@tailscale ip -4 2>/dev/null || echo "Tailscale is not running – run: sudo tailscale up"
+
+## Check /health via Tailscale IP (use from another machine: make tailscale-health)
+tailscale-health:
+	$(eval TS_IP := $(shell tailscale ip -4 2>/dev/null))
+	@if [ -z "$(TS_IP)" ]; then echo "Tailscale is not running – run: sudo tailscale up"; exit 1; fi
+	@echo ">>> Checking health at http://$(TS_IP):$(PORT)/health"
+	curl -s http://$(TS_IP):$(PORT)/health | python3 -m json.tool
+
 ## Remove uv-managed venv and build artifacts
 clean:
 	rm -rf .venv __pycache__ *.pyc
@@ -92,3 +109,8 @@ help:
 	@echo "  DURATION     (default: $(DURATION))"
 	@echo "  WHISPER_LANG (default: $(WHISPER_LANG))"
 	@echo "  AUDIO        (path to .wav for 'make test')"
+	@echo ""
+	@echo "Tailscale targets (cross-network access):"
+	@echo "  tailscale-install   install Tailscale on this machine"
+	@echo "  tailscale-ip        print this machine's Tailscale IP"
+	@echo "  tailscale-health    hit /health via Tailscale IP"
