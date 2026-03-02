@@ -174,11 +174,14 @@ class PushToTalkDaemon:
             self._stream.stop()
             self._stream.close()
             self._stream = None
-        print("⏹  Stopped. Transcribing …", flush=True)
-        threading.Thread(target=self._process, daemon=True).start()
-
-    def _process(self) -> None:
+        # Snapshot and clear immediately so any duplicate stop call or
+        # concurrent _audio_callback append cannot affect this session.
         frames = list(self._frames)
+        self._frames = []
+        print("⏹  Stopped. Transcribing …", flush=True)
+        threading.Thread(target=self._process, args=(frames,), daemon=True).start()
+
+    def _process(self, frames: list[np.ndarray]) -> None:
         if not frames:
             print("  (no audio, skipped)", flush=True)
             return
@@ -256,16 +259,16 @@ class PushToTalkDaemon:
 
     def _on_press(self, key) -> None:
         normalised = self._normalise(key)
-        self._pressed.add(normalised)
         with self._lock:
+            self._pressed.add(normalised)
             if self._hotkey_active() and self._armed and not self._recording:
                 self._start_recording()
 
     def _on_release(self, key) -> None:
         normalised = self._normalise(key)
-        was_active = self._hotkey_active()
-        self._pressed.discard(normalised)
         with self._lock:
+            was_active = self._hotkey_active()
+            self._pressed.discard(normalised)
             if was_active and self._recording:
                 self._stop_recording()
                 self._armed = False
