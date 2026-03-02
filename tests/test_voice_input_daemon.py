@@ -214,3 +214,46 @@ class TestPushToTalkStateMachine:
         daemon._on_press(Key.alt)
         daemon._on_press(Key.space)
         assert starts == 2
+
+    def test_synthetic_space_during_typing_does_not_start_recording(self):
+        """Synthetic Key.space from type_text must not trigger a ghost recording.
+
+        Root cause of the "remote duplicate" bug: pynput's Controller.type()
+        synthesises X11 events that the Listener also receives.  If the user
+        holds ctrl+alt while waiting for a slow remote API, a synthetic
+        Key.space press completes the hotkey combo and starts an unintended
+        second recording.  The _is_typing guard must prevent this.
+        """
+        daemon = PushToTalkDaemon(
+            url="http://localhost:8178",
+            lang="en",
+            hotkey=parse_hotkey("ctrl+alt+space"),
+        )
+
+        starts = 0
+
+        def fake_start() -> None:
+            nonlocal starts
+            starts += 1
+
+        daemon._start_recording = fake_start
+
+        # User pre-stages ctrl+alt while waiting for the remote API to respond.
+        daemon._on_press(Key.ctrl)
+        daemon._on_press(Key.alt)
+
+        # Daemon begins typing the previous result — _is_typing = True.
+        daemon._is_typing = True
+
+        # Synthetic Key.space from Controller.type(" ") must be ignored.
+        daemon._on_press(Key.space)
+        assert starts == 0, "ghost recording must not start while _is_typing is True"
+
+        daemon._on_release(Key.space)
+
+        # Typing finishes — _is_typing cleared.
+        daemon._is_typing = False
+
+        # Real user press of space should now start a new recording normally.
+        daemon._on_press(Key.space)
+        assert starts == 1, "recording must start again once _is_typing is False"

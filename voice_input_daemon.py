@@ -144,6 +144,7 @@ class PushToTalkDaemon:
         self._pressed: set = set()
         self._recording = False
         self._armed = True
+        self._is_typing = False  # True while type_text is injecting synthetic key events
         self._lock = threading.Lock()
         self._frames: list[np.ndarray] = []
         self._stream: sd.InputStream | None = None
@@ -232,7 +233,17 @@ class PushToTalkDaemon:
             return
 
         print(f"  ✅ {text}", flush=True)
-        type_text(text)
+        # Guard against pynput re-entrancy: Controller.type() generates synthetic
+        # X11 events that the Listener also receives.  A synthetic Key.space while
+        # the user holds ctrl+alt would otherwise complete the hotkey and start a
+        # ghost recording (the "remote duplicate" bug).
+        with self._lock:
+            self._is_typing = True
+        try:
+            type_text(text)
+        finally:
+            with self._lock:
+                self._is_typing = False
 
     # ------------------------------------------------------------------
     # Keyboard
@@ -261,7 +272,12 @@ class PushToTalkDaemon:
         normalised = self._normalise(key)
         with self._lock:
             self._pressed.add(normalised)
-            if self._hotkey_active() and self._armed and not self._recording:
+            if (
+                self._hotkey_active()
+                and self._armed
+                and not self._recording
+                and not self._is_typing
+            ):
                 self._start_recording()
 
     def _on_release(self, key) -> None:
