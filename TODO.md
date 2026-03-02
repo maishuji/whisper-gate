@@ -7,8 +7,8 @@ Items are grouped by area and roughly ordered by priority within each section.
 ## API (`whisper_api.py`)
 
 - [ ] **Persistent model loading** – currently `whisper-cli` is spawned fresh for every request, reloading the model each time (~2–3 s on large-v3). Explore keeping a long-running `whisper-cli` process or switching to the `whispercpp` Python binding to hold the model in memory between calls.
-- [ ] **Request queue / concurrency limit** – add a semaphore so concurrent transcription calls are serialised rather than spawning multiple whisper-cli processes at once and OOM-ing the GPU.
-- [ ] **Streaming response** – stream partial transcription tokens back via Server-Sent Events so the caller can display results as they appear.
+- [x] **Request queue / concurrency limit** – add a semaphore so concurrent transcription calls are serialised rather than spawning multiple whisper-cli processes at once and OOM-ing the GPU.
+- [x] **Streaming response** – stream partial transcription tokens back via Server-Sent Events so the caller can display results as they appear.
 - [ ] **Audio validation** – reject uploads that are not WAV, or not 16 kHz / mono, with a clear 422 error before invoking whisper-cli.
 - [ ] **File size limit** – enforce a max upload size (e.g. 25 MB) to prevent accidental large uploads from hanging the server.
 - [ ] **Authentication** – add an optional API key header (`X-API-Key`) so the server can be safely exposed over a network.

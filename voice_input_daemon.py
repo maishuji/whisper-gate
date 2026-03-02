@@ -80,6 +80,7 @@ def transcribe_stream(
     url: str,
     lang: str,
     on_partial: Callable[[str], None] | None = None,
+    on_received: Callable[[str], None] | None = None,
 ) -> str:
     resp = requests.post(
         f"{url.rstrip('/')}/transcribe/stream",
@@ -104,7 +105,11 @@ def transcribe_stream(
             except json.JSONDecodeError:
                 continue
 
-            if current_event == "partial":
+            if current_event == "received":
+                status = str(data.get("status", "queued"))
+                if on_received is not None:
+                    on_received(status)
+            elif current_event == "partial":
                 text = str(data.get("text", ""))
                 if on_partial is not None:
                     on_partial(text)
@@ -193,8 +198,18 @@ class PushToTalkDaemon:
             sys.stdout.write(f"\r  ✍️  {text}")
             sys.stdout.flush()
 
+        def _on_received(status: str) -> None:
+            sys.stdout.write(f"\r  ⏳ {status}…")
+            sys.stdout.flush()
+
         try:
-            text = transcribe_stream(wav_bytes, self.url, self.lang, on_partial=_on_partial)
+            text = transcribe_stream(
+                wav_bytes,
+                self.url,
+                self.lang,
+                on_partial=_on_partial,
+                on_received=_on_received,
+            )
         except requests.HTTPError as exc:
             if partials:
                 print("", flush=True)

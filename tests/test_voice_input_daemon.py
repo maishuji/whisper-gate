@@ -101,8 +101,12 @@ class _FakeResponse:
 
 class TestTranscribeStream:
     def test_transcribe_stream_happy_path(self, monkeypatch):
-        """transcribe_stream returns final text and calls on_partial for chunks."""
+        """transcribe_stream returns final text, calls on_partial for chunks, and
+        calls on_received when the server acknowledges receipt."""
         lines = [
+            "event: received",
+            'data: {"status": "queued"}',
+            "",
             "event: partial",
             'data: {"text": "hello"}',
             "",
@@ -114,16 +118,43 @@ class TestTranscribeStream:
             "",
         ]
         response = _FakeResponse(lines)
-        captured: list[str] = []
+        captured_partial: list[str] = []
+        captured_received: list[str] = []
 
         def fake_post(*args, **kwargs):
             return response
 
         monkeypatch.setattr("requests.post", fake_post)
 
-        result = transcribe_stream(b"wav", "http://localhost:8178", "en", captured.append)
+        result = transcribe_stream(
+            b"wav",
+            "http://localhost:8178",
+            "en",
+            on_partial=captured_partial.append,
+            on_received=captured_received.append,
+        )
         assert result == "hello world"
-        assert captured == ["hello", "world"]
+        assert captured_partial == ["hello", "world"]
+        assert captured_received == ["queued"]
+
+    def test_transcribe_stream_received_ignored_when_no_callback(self, monkeypatch):
+        """transcribe_stream silently ignores the received event when no on_received
+        callback is supplied, returning the final text as normal."""
+        lines = [
+            "event: received",
+            'data: {"status": "queued"}',
+            "",
+            "event: done",
+            'data: {"text": "hi"}',
+            "",
+        ]
+        response = _FakeResponse(lines)
+
+        monkeypatch.setattr("requests.post", lambda *a, **kw: response)
+
+        # No on_received supplied — must not raise
+        result = transcribe_stream(b"wav", "http://localhost:8178", "en")
+        assert result == "hi"
 
     def test_transcribe_stream_error_event(self, monkeypatch):
         """transcribe_stream raises on error event payload."""

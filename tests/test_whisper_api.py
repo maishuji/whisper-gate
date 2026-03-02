@@ -210,7 +210,7 @@ class _FakeProcess:
 
 class TestTranscribeStream:
     def test_transcribe_stream_happy_path(self, client):
-        """POST /transcribe/stream streams partial events then done."""
+        """POST /transcribe/stream streams received, partial events, then done."""
         fake_process = _FakeProcess(["hello\n", "world\n"], returncode=0)
 
         with (
@@ -227,8 +227,50 @@ class TestTranscribeStream:
             lines = [line for line in resp.iter_lines() if line]
 
         assert resp.status_code == 200
+        assert any("event: received" in line for line in lines)
         assert any("event: partial" in line for line in lines)
         assert any("event: done" in line for line in lines)
+
+        # received must appear before the first partial
+        event_names = [
+            line.split("event:")[1].strip() for line in lines if line.startswith("event:")
+        ]
+        assert event_names[0] == "received"
+
+    def test_transcribe_stream_received_emitted_before_popen(self, client):
+        """POST /transcribe/stream emits received even when Popen would block.
+
+        This verifies that the remote client gets an immediate acknowledgement
+        before the semaphore is acquired and the model starts loading.
+        """
+        import threading
+
+        popen_started = threading.Event()
+
+        class _BlockingProcess(_FakeProcess):
+            def __init__(self):
+                # Signal that Popen has been called, then continue immediately.
+                popen_started.set()
+                super().__init__(["hi\n"], returncode=0)
+
+        collected: list[str] = []
+
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("subprocess.Popen", side_effect=lambda *a, **kw: _BlockingProcess()),
+            patch("os.remove"),
+            client.stream(
+                "POST",
+                "/transcribe/stream",
+                files={"audio": ("test.wav", _make_wav_bytes(), "audio/wav")},
+                data={"lang": "en"},
+            ) as resp,
+        ):
+            for line in resp.iter_lines():
+                if line:
+                    collected.append(line)
+
+        assert any("event: received" in line for line in collected)
 
     def test_transcribe_stream_error_event(self, client):
         """POST /transcribe/stream sends error event on non-zero exit."""

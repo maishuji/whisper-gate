@@ -1,8 +1,10 @@
+import asyncio
 import contextlib
 import json
 import os
 import subprocess
 import tempfile
+import threading
 from collections.abc import Generator
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -22,6 +24,11 @@ CLI = os.path.expanduser(
 MODEL = os.path.expanduser(
     os.environ.get("WHISPER_MODEL", "~/Workplace/whisper.cpp/models/ggml-base.bin")
 )
+
+# Serialise concurrent whisper-cli invocations so multiple requests cannot OOM
+# the GPU simultaneously.  Remote clients queued behind the semaphore receive an
+# immediate SSE "received" acknowledgement so they are not left in silence.
+_WHISPER_SEM = threading.BoundedSemaphore(1)
 
 
 @APP.get("/health")
@@ -82,8 +89,12 @@ async def transcribe(
 
     cmd = _build_cmd(tmp, lang, device, no_flash_attn)
 
+    def _run() -> subprocess.CompletedProcess[str]:
+        with _WHISPER_SEM:
+            return subprocess.run(cmd, capture_output=True, text=True)
+
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = await asyncio.to_thread(_run)
         if result.returncode != 0:
             raise HTTPException(
                 status_code=500,
@@ -137,31 +148,35 @@ async def transcribe_stream(
         process: subprocess.Popen[str] | None = None
         collected: list[str] = []
         try:
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
-            )
-            if process.stdout is None:
-                yield _sse_event("error", {"error": "failed to capture stdout"})
-                return
+            # Acknowledge receipt immediately so the remote client is not left
+            # in silence while the semaphore blocks or the model loads.
+            yield _sse_event("received", {"status": "queued"})
+            with _WHISPER_SEM:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1,
+                )
+                if process.stdout is None:
+                    yield _sse_event("error", {"error": "failed to capture stdout"})
+                    return
 
-            for line in process.stdout:
-                chunk = line.rstrip("\n")
-                if not chunk:
-                    continue
-                collected.append(chunk)
-                yield _sse_event("partial", {"text": chunk})
+                for line in process.stdout:
+                    chunk = line.rstrip("\n")
+                    if not chunk:
+                        continue
+                    collected.append(chunk)
+                    yield _sse_event("partial", {"text": chunk})
 
-            return_code = process.wait()
-            if return_code != 0:
-                yield _sse_event("error", {"error": "whisper-cli exited with an error"})
-                return
+                return_code = process.wait()
+                if return_code != 0:
+                    yield _sse_event("error", {"error": "whisper-cli exited with an error"})
+                    return
 
-            full_text = "\n".join(collected).strip()
-            yield _sse_event("done", {"text": full_text})
+                full_text = "\n".join(collected).strip()
+                yield _sse_event("done", {"text": full_text})
         except Exception:
             yield _sse_event("error", {"error": "failed to run whisper-cli"})
         finally:
