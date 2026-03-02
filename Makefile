@@ -1,7 +1,8 @@
-.PHONY: install run dev health test test-unit record list-devices ptt download-model download-model-en download-model-large lint fmt clean help tailscale-install tailscale-ip tailscale-health
+.PHONY: install run dev health test test-unit record list-devices ptt download-model download-model-en download-model-large lint fmt clean help tailscale-install tailscale-install-windows tailscale-ip tailscale-health
 
 HOST          ?= 0.0.0.0
 PORT          ?= 8178
+URL           ?= http://localhost:$(PORT)
 DURATION      ?= 5
 WHISPER_LANG  ?= en
 WHISPER_MODEL ?= $(HOME)/Workplace/whisper.cpp/models/ggml-base.bin
@@ -41,7 +42,7 @@ test:
 
 ## Record from microphone and transcribe (DURATION=seconds WHISPER_LANG=code URL=http://...)
 record:
-	uv run record_and_transcribe.py --url http://localhost:$(PORT) --duration $(DURATION) --lang $(WHISPER_LANG)
+	uv run record_and_transcribe.py --url $(URL) --duration $(DURATION) --lang $(WHISPER_LANG)
 
 ## List available audio input devices
 list-devices:
@@ -49,10 +50,7 @@ list-devices:
 
 ## Start push-to-talk daemon (hold PTT_KEY to record, release to type)
 ptt:
-	WHISPER_LANG=$(WHISPER_LANG) uv run voice_input_daemon.py \
-		--url http://localhost:$(PORT) \
-		--lang $(WHISPER_LANG) \
-		--key "$(PTT_KEY)"
+	uv run voice_input_daemon.py --url $(URL) --lang $(WHISPER_LANG) --key "$(PTT_KEY)"
 
 ## Download the multilingual base model (required for non-English languages)
 download-model:
@@ -84,6 +82,12 @@ tailscale-install:
 	@echo ">>> Run: sudo tailscale up"
 	@echo ">>> Then run: make tailscale-ip"
 
+## Install Tailscale (Windows, via winget)
+tailscale-install-windows:
+	winget install --id Tailscale.Tailscale --exact --source winget
+	@echo ">>> Open an elevated PowerShell and run: tailscale up"
+	@echo ">>> Then run: make tailscale-ip"
+
 ## Show this machine's Tailscale IP
 tailscale-ip:
 	@tailscale ip -4 2>/dev/null || echo "Tailscale is not running – run: sudo tailscale up"
@@ -106,11 +110,13 @@ help:
 	@echo "Variables (override with make <target> VAR=value):"
 	@echo "  HOST  (default: $(HOST))"
 	@echo "  PORT         (default: $(PORT))"
+	@echo "  URL          (default: $(URL))"
 	@echo "  DURATION     (default: $(DURATION))"
 	@echo "  WHISPER_LANG (default: $(WHISPER_LANG))"
 	@echo "  AUDIO        (path to .wav for 'make test')"
 	@echo ""
 	@echo "Tailscale targets (cross-network access):"
-	@echo "  tailscale-install   install Tailscale on this machine"
+	@echo "  tailscale-install           install Tailscale on Linux"
+	@echo "  tailscale-install-windows   install Tailscale on Windows (winget)"
 	@echo "  tailscale-ip        print this machine's Tailscale IP"
 	@echo "  tailscale-health    hit /health via Tailscale IP"

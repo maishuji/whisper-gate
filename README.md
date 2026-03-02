@@ -328,6 +328,10 @@ Recordings shorter than 0.5 seconds are silently dropped to avoid spurious API c
 | `make download-model` | Download `ggml-base.bin` |
 | `make download-model-en` | Download `ggml-base.en.bin` |
 | `make download-model-large` | Download `ggml-large-v3.bin` (~3.1 GB) |
+| `make tailscale-install` | Install Tailscale on Linux |
+| `make tailscale-install-windows` | Install Tailscale on Windows via winget |
+| `make tailscale-ip` | Print this machine's Tailscale IPv4 |
+| `make tailscale-health` | Hit `/health` via this machine's Tailscale IP |
 | `make clean` | Delete `.venv/`, `__pycache__/`, and `.pyc` files |
 | `make help` | Show all targets and configurable variables |
 
@@ -338,6 +342,8 @@ make run  PORT=9000
 make run  WHISPER_MODEL=~/Workplace/whisper.cpp/models/ggml-large-v3.bin
 make ptt  PTT_KEY="ctrl+shift+r"  WHISPER_LANG=fr
 make record  DURATION=10  WHISPER_LANG=de
+make record  URL=http://100.110.122.117:8178
+make ptt  URL=http://100.110.122.117:8178  WHISPER_LANG=en
 ```
 
 ---

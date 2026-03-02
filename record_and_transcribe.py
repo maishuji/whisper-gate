@@ -21,6 +21,13 @@ SAMPLE_RATE = 16000  # whisper expects 16 kHz
 CHANNELS = 1
 
 
+def normalize_base_url(url: str) -> str:
+    normalized = url.strip().rstrip("/")
+    if normalized.startswith(("http://", "https://")):
+        return normalized
+    return f"http://{normalized}"
+
+
 def list_devices() -> None:
     print(sd.query_devices())
 
@@ -50,14 +57,26 @@ def to_wav_bytes(audio: np.ndarray) -> bytes:
 
 
 def transcribe(wav_bytes: bytes, url: str, lang: str) -> str:
-    resp = requests.post(
-        f"{url.rstrip('/')}/transcribe",
-        files={"audio": ("audio.wav", wav_bytes, "audio/wav")},
-        data={"lang": lang},
-        timeout=120,
-    )
-    resp.raise_for_status()
-    return resp.json().get("text", "")
+    endpoint = f"{normalize_base_url(url)}/transcribe"
+    try:
+        resp = requests.post(
+            endpoint,
+            files={"audio": ("audio.wav", wav_bytes, "audio/wav")},
+            data={"lang": lang},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        return resp.json().get("text", "")
+    except requests.ConnectionError as exc:
+        raise RuntimeError(
+            f"Cannot reach whisper API at {endpoint}. "
+            "Start the server first (for example: `make run`)."
+        ) from exc
+    except requests.Timeout as exc:
+        raise RuntimeError(
+            "Transcription request timed out. "
+            "Check that the API server is up and whisper-cli is responsive."
+        ) from exc
 
 
 def main() -> None:
@@ -83,6 +102,9 @@ def main() -> None:
     print("⏳  Transcribing …", flush=True)
     try:
         text = transcribe(wav_bytes, args.url, args.lang)
+    except RuntimeError as exc:
+        print(f"❌  {exc}", file=sys.stderr)
+        sys.exit(1)
     except requests.HTTPError as exc:
         print(f"❌  API error: {exc.response.status_code} - {exc.response.text}", file=sys.stderr)
         sys.exit(1)
