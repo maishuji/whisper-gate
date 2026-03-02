@@ -138,6 +138,7 @@ class PushToTalkDaemon:
 
         self._pressed: set = set()
         self._recording = False
+        self._armed = True
         self._lock = threading.Lock()
         self._frames: list[np.ndarray] = []
         self._stream: sd.InputStream | None = None
@@ -235,18 +236,26 @@ class PushToTalkDaemon:
     def _hotkey_active(self) -> bool:
         return all(self._normalise(k) in self._pressed for k in self.hotkey)
 
+    def _any_hotkey_key_pressed(self) -> bool:
+        return any(self._normalise(k) in self._pressed for k in self.hotkey)
+
     def _on_press(self, key) -> None:
-        self._pressed.add(self._normalise(key))
+        normalised = self._normalise(key)
+        self._pressed.add(normalised)
         with self._lock:
-            if self._hotkey_active() and not self._recording:
+            if self._hotkey_active() and self._armed and not self._recording:
                 self._start_recording()
 
     def _on_release(self, key) -> None:
+        normalised = self._normalise(key)
         was_active = self._hotkey_active()
-        self._pressed.discard(self._normalise(key))
+        self._pressed.discard(normalised)
         with self._lock:
             if was_active and self._recording:
                 self._stop_recording()
+                self._armed = False
+            if not self._any_hotkey_key_pressed():
+                self._armed = True
 
     # ------------------------------------------------------------------
     # Public

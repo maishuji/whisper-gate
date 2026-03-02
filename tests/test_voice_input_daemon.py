@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 from pynput.keyboard import Key
 
-from voice_input_daemon import parse_hotkey, to_wav_bytes, transcribe_stream
+from voice_input_daemon import PushToTalkDaemon, parse_hotkey, to_wav_bytes, transcribe_stream
 
 
 class TestParseHotkey:
@@ -137,3 +137,49 @@ class TestTranscribeStream:
 
         with pytest.raises(RuntimeError, match="boom"):
             transcribe_stream(b"wav", "http://localhost:8178", "en")
+
+
+class TestPushToTalkStateMachine:
+    def test_rearm_requires_full_hotkey_release(self):
+        """After stop, daemon must not restart until all hotkey keys are released."""
+        daemon = PushToTalkDaemon(
+            url="http://localhost:8178",
+            lang="en",
+            hotkey=parse_hotkey("ctrl+alt+space"),
+        )
+
+        starts = 0
+        stops = 0
+
+        def fake_start() -> None:
+            nonlocal starts
+            starts += 1
+            daemon._recording = True
+
+        def fake_stop() -> None:
+            nonlocal stops
+            stops += 1
+            daemon._recording = False
+
+        daemon._start_recording = fake_start
+        daemon._stop_recording = fake_stop
+
+        daemon._on_press(Key.ctrl)
+        daemon._on_press(Key.alt)
+        daemon._on_press(Key.space)
+        assert starts == 1
+
+        daemon._on_release(Key.space)
+        assert stops == 1
+
+        daemon._on_press(Key.space)
+        assert starts == 1
+
+        daemon._on_release(Key.ctrl)
+        daemon._on_release(Key.alt)
+        daemon._on_release(Key.space)
+
+        daemon._on_press(Key.ctrl)
+        daemon._on_press(Key.alt)
+        daemon._on_press(Key.space)
+        assert starts == 2
